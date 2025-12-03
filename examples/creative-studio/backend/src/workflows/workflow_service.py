@@ -36,7 +36,7 @@ from google.auth.transport.requests import AuthorizedSession
 from src.workflows.schema.workflow_model import (
     NodeTypes,
     WorkflowCreateDto,
-
+    StepOutputReference,
     WorkflowModel,
 )
 
@@ -165,7 +165,7 @@ class WorkflowService:
         client = workflows_v1.WorkflowsClient()
 
         # Initialize request argument(s)
-        workflow = workflows_v1.Workflow()
+        workflow = workflows_v1.Workflow(name = f"projects/{PROJECT_ID}/locations/{LOCATION}/workflows/{workflow_id}")
         workflow.source_contents = source_contents
         workflow.execution_history_level = (
             workflows_v1.ExecutionHistoryLevel.EXECUTION_HISTORY_DETAILED
@@ -173,7 +173,6 @@ class WorkflowService:
 
         request = workflows_v1.UpdateWorkflowRequest(
             workflow=workflow,
-            name=f"projects/{PROJECT_ID}/locations/{LOCATION}/workflows/{workflow_id}",
         )
 
         operation = client.update_workflow(request=request)
@@ -319,11 +318,9 @@ class WorkflowService:
             return None
 
         result = None
+        user_inputs = json.loads(execution.argument) if execution.argument else {}
         if execution.state == executions_v1.Execution.State.SUCCEEDED:
-             try:
-                result = json.loads(execution.result)
-             except:
-                 result = execution.result
+            result = execution.result
         
         # Fetch step entries using REST API
         step_entries = []
@@ -341,9 +338,6 @@ class WorkflowService:
         except Exception as e:
             logger.error(f"Error fetching step entries: {e}")
 
-        logger.info("Step entries:")
-        logger.info(json.dumps(step_entries))
-
         # Calculate duration
         duration = 0.0
         if execution.start_time:
@@ -355,23 +349,40 @@ class WorkflowService:
                 import time
                 duration = time.time() - start_timestamp
 
-        # Format step entries
+        # Fetch workflow definition for input resolution
+        workflow_model = self.get_by_id(workflow_id)
+        user_input_step_id = workflow_model.steps[0].step_id
+
+        previous_outputs = {}
         formatted_step_entries = []
         for entry in step_entries:
             step_id = entry.get("step")
             if step_id == "end":
                 continue
+
+            current_step = [step for step in workflow_model.steps if step.step_id == step_id][0]            
             step_state = entry.get("state")
             
-            # Extract inputs and outputs from the call details
+            # Extract inputs from step
+            step_inputs = {}
+            for inp_name, inp_value in current_step.inputs:
+                if isinstance(inp_value, StepOutputReference):
+                    inp_step_id = inp_value.step
+                    inp_output_name = inp_value.output
+                    if inp_step_id == user_input_step_id:
+                        value = user_inputs.get(inp_output_name)
+                    else:
+                        value = previous_outputs.get(inp_step_id, {}).get(inp_output_name)
+                    step_inputs[inp_name] = value
+                else: # This else means the input is a static value
+                    step_inputs[inp_name] = inp_value
+
+            # Extract outputs from step
             variable_data = entry.get("variableData", {})
             variables = variable_data.get("variables", {})
-            step_inputs = variables.get("args", {})
-            # Magic to remove the user_auth_header from the inputs
-            step_inputs.pop('user_auth_header', None)
             step_results = variables.get(f"{step_id}_result", {})
             step_outputs = step_results.get("body", {})
-
+            previous_outputs[step_id] = step_outputs
             formatted_step_entries.append({
                 "step_id": step_id,
                 "state": step_state,
