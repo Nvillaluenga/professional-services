@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { importProvidersFrom, NgModule } from '@angular/core';
+import { importProvidersFrom, Injector, NgModule } from '@angular/core';
 import { initializeApp, provideFirebaseApp } from '@angular/fire/app';
 import { getAuth, provideAuth } from '@angular/fire/auth';
 import { getFirestore, provideFirestore } from '@angular/fire/firestore';
@@ -31,6 +31,8 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { BrowserModule, provideClientHydration } from '@angular/platform-browser';
 import { environment } from '../environments/environment';
+import { setAppInjector } from './app-injector';
+import { NotificationContainerComponent } from './common/components/notification-container/notification-container.component';
 
 import { ClipboardModule } from '@angular/cdk/clipboard';
 import { DragDropModule } from '@angular/cdk/drag-drop';
@@ -73,11 +75,11 @@ import { ArenaComponent } from './arena/arena.component';
 import { AudioComponent } from './audio/audio.component';
 import { AuthInterceptor } from './auth.interceptor';
 import { ConfirmationDialogComponent } from './common/components/confirmation-dialog/confirmation-dialog.component';
+import { FlowPromptBoxComponent } from "./common/components/flow-prompt-box/flow-prompt-box.component";
 import { ImageCropperDialogComponent } from './common/components/image-cropper-dialog/image-cropper-dialog.component';
 import { ImageSelectorComponent } from './common/components/image-selector/image-selector.component';
 import { MediaLightboxComponent } from './common/components/media-lightbox/media-lightbox.component';
 import { SourceAssetGalleryComponent } from './common/components/source-asset-gallery/source-asset-gallery.component';
-import { ToastMessageComponent } from './common/components/toast-message/toast-message.component';
 import { SharedModule } from './common/shared.module';
 import { AddVoiceDialogComponent } from './components/add-voice-dialog/add-voice-dialog.component';
 import { FooterComponent } from './footer/footer.component';
@@ -104,7 +106,6 @@ import { WorkflowListComponent } from './workflows/workflow-list/workflow-list.c
     HeaderComponent,
     FooterComponent,
     HomeComponent,
-    ToastMessageComponent,
     LoginComponent,
     ConfirmationDialogComponent,
     FunTemplatesComponent,
@@ -163,6 +164,8 @@ import { WorkflowListComponent } from './workflows/workflow-list/workflow-list.c
     ImageCropperComponent,
     MatButtonToggleModule,
     MatSliderModule,
+    NotificationContainerComponent,
+    FlowPromptBoxComponent,
     DragDropModule,
     MatPaginatorModule,
     ClipboardModule
@@ -191,4 +194,8 @@ import { WorkflowListComponent } from './workflows/workflow-list/workflow-list.c
   ],
   bootstrap: [AppComponent],
 })
-export class AppModule { }
+export class AppModule {
+  constructor(injector: Injector) {
+    setAppInjector(injector);
+  }
+}
